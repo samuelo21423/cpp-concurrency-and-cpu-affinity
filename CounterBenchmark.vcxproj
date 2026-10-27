@@ -24,6 +24,7 @@
     <ProjectGuid>{8a654581-bce6-445c-acdb-9aa6ab873d51}</ProjectGuid>
     <RootNamespace>CounterBenchmark</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>CounterBenchmark</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -139,7 +140,16 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="CounterBenchmark.cpp" />
+    <ClCompile Include="benchmark.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="workers.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="benchmark.h" />
+    <ClInclude Include="config.h" />
+    <ClInclude Include="workers.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
