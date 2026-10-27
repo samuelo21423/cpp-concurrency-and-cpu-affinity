@@ -11,9 +11,16 @@ constexpr int NumberOfRuns = 10;
 
 // Shared state intentionally left unsynchronised.
 // This allows the benchmark to expose lost updates caused by a race condition.
+
+
+// ==================== Shared State ====================
+
 long count = 0;
 std::mutex counterMutex;
 std::atomic<long> atomicCount = 0;
+
+
+// ==================== Worker Functions ====================
 
 void worker()
 {
@@ -40,7 +47,35 @@ void atomicWorker()
     }
 }
 
-int main()
+// ==================== Counter Helpers ====================
+
+void resetCount()
+{
+    count = 0;
+}
+
+long getCount()
+{
+    return count;
+}
+
+void resetAtomicCount()
+{
+    atomicCount = 0;
+}
+
+long getAtomicCount()
+{
+    return atomicCount.load();
+}
+
+// ==================== Benchmark Runner ====================
+
+void runBenchmark(
+    const char* name,
+    void (*workerFunction)(),
+    void (*resetFunction)(),
+    long (*getCountFunction)())
 {
     const long expectedCount = IterationsPerThread * 2;
 
@@ -51,21 +86,16 @@ int main()
     double minTime = std::numeric_limits<double>::max();
     double maxTime = 0.0;
 
-    // ==================== Unsynchronised Benchmark ====================
-
-    std::cout << "Unsynchronised Counter Benchmark\n";
-    std::cout << "Threads: 2\n";
-    std::cout << "Iterations per thread: " << IterationsPerThread << '\n';
-    std::cout << "Expected count: " << expectedCount << "\n\n";
+    std::cout << "\n=== " << name << " Benchmark ===\n";
 
     for (int run = 1; run <= NumberOfRuns; ++run)
     {
-        count = 0;
+        resetFunction();
 
         const auto start = std::chrono::steady_clock::now();
 
-        std::thread threadA(worker);
-        std::thread threadB(worker);
+        std::thread threadA(workerFunction);
+        std::thread threadB(workerFunction);
 
         threadA.join();
         threadB.join();
@@ -75,173 +105,7 @@ int main()
         const double elapsed =
             std::chrono::duration<double, std::milli>(end - start).count();
 
-        if (count == expectedCount)
-        {
-            correctRuns++;
-        }
-
-        totalFinalCount += count;
-        totalTime += elapsed;
-
-        if (elapsed < minTime)
-        {
-            minTime = elapsed;
-        }
-
-        if (elapsed > maxTime)
-        {
-            maxTime = elapsed;
-        }
-
-        std::cout << "Run " << run
-            << " | Final count: " << count
-            << " | Correct: " << (count == expectedCount ? "Yes" : "No")
-            << " | Time: " << elapsed << " ms\n";
-    }
-
-    const double averageFinalCount =
-        static_cast<double>(totalFinalCount) / NumberOfRuns;
-
-    const double averageTime =
-        totalTime / NumberOfRuns;
-
-    const double correctnessRate =
-        (static_cast<double>(correctRuns) / NumberOfRuns) * 100.0;
-
-    std::cout << "\nSummary\n";
-
-    std::cout << "Correct runs: "
-        << correctRuns << "/" << NumberOfRuns << '\n';
-
-    std::cout << "Correctness rate: "
-        << correctnessRate << "%\n";
-
-    std::cout << "Average final count: "
-        << std::fixed << std::setprecision(0)
-        << averageFinalCount << '\n';
-
-    std::cout << std::setprecision(4);
-
-    std::cout << "Average runtime: "
-        << averageTime << " ms\n";
-
-    std::cout << "Minimum runtime: "
-        << minTime << " ms\n";
-
-    std::cout << "Maximum runtime: "
-        << maxTime << " ms\n";
-
-    // ==================== Mutex Benchmark ====================
-
-    std::cout << "\n=== Mutex Benchmark ===\n";
-
-    correctRuns = 0;
-    totalFinalCount = 0;
-    totalTime = 0.0;
-    minTime = std::numeric_limits<double>::max();
-    maxTime = 0.0;
-
-    for (int run = 1; run <= NumberOfRuns; ++run)
-    {
-        count = 0;
-
-        const auto start = std::chrono::steady_clock::now();
-
-        std::thread threadA(mutexWorker);
-        std::thread threadB(mutexWorker);
-
-        threadA.join();
-        threadB.join();
-
-        const auto end = std::chrono::steady_clock::now();
-
-        const double elapsed =
-            std::chrono::duration<double, std::milli>(end - start).count();
-
-        if (count == expectedCount)
-        {
-            correctRuns++;
-        }
-
-        totalFinalCount += count;
-        totalTime += elapsed;
-
-        if (elapsed < minTime)
-        {
-            minTime = elapsed;
-        }
-
-        if (elapsed > maxTime)
-        {
-            maxTime = elapsed;
-        }
-
-        std::cout << "Run " << run
-            << " | Final count: " << count
-            << " | Correct: " << (count == expectedCount ? "Yes" : "No")
-            << " | Time: " << elapsed << " ms\n";
-    }
-
-    const double mutexAverageFinalCount =
-        static_cast<double>(totalFinalCount) / NumberOfRuns;
-
-    const double mutexAverageTime =
-        totalTime / NumberOfRuns;
-
-    const double mutexCorrectnessRate =
-        (static_cast<double>(correctRuns) / NumberOfRuns) * 100.0;
-
-    std::cout << "\nMutex Summary\n";
-
-    std::cout << "Correct runs: "
-        << correctRuns << "/" << NumberOfRuns << '\n';
-
-    std::cout << "Correctness rate: "
-        << mutexCorrectnessRate << "%\n";
-
-    std::cout << "Average final count: "
-        << std::fixed << std::setprecision(0)
-        << mutexAverageFinalCount << '\n';
-
-    std::cout << std::setprecision(4);
-
-    std::cout << "Average runtime: "
-        << mutexAverageTime << " ms\n";
-
-    std::cout << "Minimum runtime: "
-        << minTime << " ms\n";
-
-    std::cout << "Maximum runtime: "
-        << maxTime << " ms\n";
-
-    // ==================== Atomic Benchmark ====================
-
-    std::cout << "\n=== Atomic Benchmark ===\n";
-
-    correctRuns = 0;
-    totalFinalCount = 0;
-    totalTime = 0.0;
-    minTime = std::numeric_limits<double>::max();
-    maxTime = 0.0;
-
-    for (int run = 1; run <= NumberOfRuns; ++run)
-    {
-        atomicCount = 0;
-
-        const auto start = std::chrono::steady_clock::now();
-
-        std::thread threadA(atomicWorker);
-        std::thread threadB(atomicWorker);
-
-        threadA.join();
-        threadB.join();
-
-        const auto end = std::chrono::steady_clock::now();
-
-        const double elapsed =
-            std::chrono::duration<double, std::milli>(end - start).count();
-
-        const long finalCount = atomicCount.load();
+        const long finalCount = getCountFunction();
 
         if (finalCount == expectedCount)
         {
@@ -263,41 +127,68 @@ int main()
 
         std::cout << "Run " << run
             << " | Final count: " << finalCount
-            << " | Correct: " << (finalCount == expectedCount ? "Yes" : "No")
+            << " | Correct: "
+            << (finalCount == expectedCount ? "Yes" : "No")
             << " | Time: " << elapsed << " ms\n";
     }
 
-    const double atomicAverageFinalCount =
+    const double averageFinalCount =
         static_cast<double>(totalFinalCount) / NumberOfRuns;
 
-    const double atomicAverageTime =
+    const double averageTime =
         totalTime / NumberOfRuns;
 
-    const double atomicCorrectnessRate =
+    const double correctnessRate =
         (static_cast<double>(correctRuns) / NumberOfRuns) * 100.0;
 
-    std::cout << "\nAtomic Summary\n";
+    std::cout << "\n" << name << " Summary\n";
 
     std::cout << "Correct runs: "
         << correctRuns << "/" << NumberOfRuns << '\n';
 
     std::cout << "Correctness rate: "
-        << atomicCorrectnessRate << "%\n";
+        << correctnessRate << "%\n";
 
     std::cout << "Average final count: "
         << std::fixed << std::setprecision(0)
-        << atomicAverageFinalCount << '\n';
+        << averageFinalCount << '\n';
 
     std::cout << std::setprecision(4);
 
     std::cout << "Average runtime: "
-        << atomicAverageTime << " ms\n";
+        << averageTime << " ms\n";
 
     std::cout << "Minimum runtime: "
         << minTime << " ms\n";
 
     std::cout << "Maximum runtime: "
         << maxTime << " ms\n";
+}
+
+
+
+
+// ==================== Program Entry Point ====================
+
+int main()
+{
+    runBenchmark(
+        "Unsynchronised",
+        worker,
+        resetCount,
+        getCount);
+
+    runBenchmark(
+        "Mutex",
+        mutexWorker,
+        resetCount,
+        getCount);
+
+    runBenchmark(
+        "Atomic",
+        atomicWorker,
+        resetAtomicCount,
+        getAtomicCount);
 
     return 0;
 }
